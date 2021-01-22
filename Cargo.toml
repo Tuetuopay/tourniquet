@@ -1,0 +1,19 @@
+[package]
+name = "tourniquet"
+version = "0.1.0"
+authors = ["Tuetuopay <tuetuopay@me.com>"]
+license = "MIT"
+readme = "README.md"
+repository = "https://github.com/Tuetuopay/tourniquet"
+description = "Async native round-robin manager for remote services"
+categories = [
+    "algorithms",
+    "asynchronous",
+    "concurrency",
+]
+keywords = ["async", "round-robin"]
+edition = "2018"
+
+[dependencies]
+async-trait = "0.1"
+tokio = { version = "0.2", features = ["sync"] }
