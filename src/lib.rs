@@ -13,6 +13,11 @@ use std::{
 
 use async_trait::async_trait;
 use tokio::sync::RwLock;
+#[cfg(feature = "tracing")]
+use tracing::{
+    field::{debug, display, Empty},
+    instrument, Instrument, Span,
+};
 
 /**
  * Trait indicating wether an error mandates trying the next service.
@@ -105,12 +110,23 @@ where
         self.max_attempts = count;
     }
 
+    #[cfg_attr(
+        feature = "tracing",
+        tracing::instrument(skip(self, run), err, fields(service = Empty, index = Empty)),
+    )]
     async fn run_inner<Run, RunFut, T>(&self, run: &Run, current: usize) -> Result<T, E>
     where
         Run: Fn(Arc<Svc>) -> RunFut,
         RunFut: Future<Output = Result<T, E>>,
     {
         let index = current % self.sources.len();
+
+        #[cfg(feature = "tracing")]
+        {
+            let span = Span::current();
+            span.record("index", &display(index));
+            span.record("service", &debug(&self.sources[index]));
+        }
 
         // Connect if not already connected
         if self.service.read().await.is_none() {
@@ -119,7 +135,10 @@ where
         }
 
         // Run
-        let res = run(self.service.read().await.clone().unwrap()).await;
+        let fut = run(self.service.read().await.clone().unwrap());
+        #[cfg(feature = "tracing")]
+        let fut = fut.instrument(tracing::debug_span!("run_fn"));
+        let res = fut.await;
 
         if let Err(ref e) = res {
             // Trash handler only if that's a next error and if we didn't already move to the next
@@ -137,6 +156,7 @@ where
      *
      * The connection to the service will be established at this point if not already established.
      */
+    #[cfg_attr(feature = "tracing", instrument(skip(self, run), err))]
     pub async fn run<R, Fut, T>(&self, run: R) -> Result<T, E>
     where
         R: Fn(Arc<Svc>) -> Fut,
@@ -152,7 +172,9 @@ where
                 Ok(t) => return Ok(t),
                 Err(e) => {
                     if e.is_next() {
-                        // TODO better error handling
+                        #[cfg(feature = "tracing")]
+                        tracing::error!("Service {}/{} failed: {}", current % n_svc, n_svc, e);
+                        #[cfg(not(feature = "tracing"))]
                         eprintln!("Service {}/{} failed: {}", current % n_svc, n_svc, e);
 
                         self.current.fetch_add(1, Ordering::Relaxed);
