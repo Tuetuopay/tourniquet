@@ -20,6 +20,9 @@ tokio = { version = "0.2", features = ["sync"] }
 tracing = { version = "0.1", optional = true }
 tracing-futures = { version = "0.2", optional = true }
 
+# Dependencies for optional integrations
+celery = { version = "0.3", optional = true, default-features = false }
+
 [dev-dependencies]
 celery = "0.3"
 serde = "1.0"

@@ -52,6 +52,13 @@ use tracing::{
     instrument, Instrument, Span,
 };
 
+pub mod integrations;
+
+pub mod conn {
+    #[cfg(feature = "celery")]
+    pub use crate::integrations::celery::CeleryConnector;
+}
+
 /// Trait indicating wether an error mandates trying the next service.
 ///
 /// It is returned by the round-robin handler or the connector, and indicates wether we should
