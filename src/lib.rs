@@ -11,7 +11,7 @@ use std::{
     sync::Arc,
 };
 
-use async_trait::async_trait;
+pub use async_trait::async_trait;
 use tokio::sync::RwLock;
 #[cfg(feature = "tracing")]
 use tracing::{
