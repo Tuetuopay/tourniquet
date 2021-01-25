@@ -312,3 +312,173 @@ where
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::sync::{
+        atomic::{AtomicUsize, Ordering},
+        Arc,
+    };
+
+    #[derive(Debug, PartialEq)]
+    enum Error {
+        Timeout,
+        NotFound,
+    }
+
+    impl std::fmt::Display for Error {
+        fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+            write!(f, "{:?}", self)
+        }
+    }
+
+    impl Next for Error {
+        fn is_next(&self) -> bool {
+            *self == Self::Timeout
+        }
+    }
+
+    struct Conn {
+        count: Arc<AtomicUsize>,
+        ok_from: i32,
+    }
+
+    #[async_trait]
+    impl Connector<i32, i32, Error> for Conn {
+        async fn connect(&self, src: &i32) -> Result<i32, Error> {
+            self.count.fetch_add(1, Ordering::Relaxed);
+            if *src < self.ok_from {
+                Err(Error::Timeout)
+            } else {
+                Ok(*src)
+            }
+        }
+    }
+
+    fn build_rr(
+        svcs: Vec<i32>,
+        ok_from: i32,
+    ) -> (RoundRobin<i32, i32, Error, Conn>, Arc<AtomicUsize>) {
+        let count = Arc::new(AtomicUsize::new(0));
+        let cnt = count.clone();
+
+        (RoundRobin::new(svcs, Conn { count: cnt, ok_from }), count)
+    }
+
+    #[tokio::test]
+    async fn test_first_called() {
+        let (rr, count_conn) = build_rr(vec![0, 1], 0);
+
+        let count_run = AtomicUsize::new(0);
+
+        rr.run(|_| async { Ok(count_run.fetch_add(1, Ordering::Relaxed)) }).await.unwrap();
+
+        // Async blocks should be called only once
+        assert_eq!(count_conn.load(Ordering::Relaxed), 1);
+        assert_eq!(count_run.load(Ordering::Relaxed), 1);
+
+        rr.run(|_| async { Ok(count_run.fetch_add(1, Ordering::Relaxed)) }).await.unwrap();
+
+        // Connector should not have been called a second time, though the run block should.
+        assert_eq!(count_conn.load(Ordering::Relaxed), 1);
+        assert_eq!(count_run.load(Ordering::Relaxed), 2);
+    }
+
+    #[tokio::test]
+    async fn test_exhausted_run() {
+        let (mut rr, count_conn) = build_rr(vec![0, 1], 0);
+
+        let count = AtomicUsize::new(0);
+
+        // With a single attemt, options will be exhausted
+        rr.set_max_attempts(1);
+
+        let res = rr
+            .run(|n| {
+                count.fetch_add(1, Ordering::Relaxed);
+                async move {
+                    match *n {
+                        0 => Err(Error::Timeout), // Next error
+                        _ => Ok(n),
+                    }
+                }
+            })
+            .await;
+
+        assert_eq!(count_conn.load(Ordering::Relaxed), 1);
+        match res {
+            Ok(_) => panic!("Run did not error"),
+            Err(Error::Timeout) => (),
+            Err(_) => panic!("Wrong error"),
+        }
+        assert_eq!(count.load(Ordering::Relaxed), 1);
+    }
+
+    #[tokio::test]
+    async fn test_try_next_run() {
+        let (rr, count_conn) = build_rr(vec![0, 1], 0);
+
+        let count = AtomicUsize::new(0);
+
+        rr.run(|n| {
+            count.fetch_add(1, Ordering::Relaxed);
+            async move {
+                match *n {
+                    0 => Err(Error::Timeout), // Next error
+                    _ => Ok(n),
+                }
+            }
+        })
+        .await
+        .unwrap();
+
+        assert_eq!(count_conn.load(Ordering::Relaxed), 2);
+        assert_eq!(count.load(Ordering::Relaxed), 2);
+    }
+
+    #[tokio::test]
+    async fn test_exhausted_connector() {
+        let (mut rr, count_conn) = build_rr(vec![0, 1], 1);
+
+        let count = AtomicUsize::new(0);
+
+        // With a single attemt, options will be exhausted
+        rr.set_max_attempts(1);
+
+        let res = rr.run(|_| async { Ok(count.fetch_add(1, Ordering::Relaxed)) }).await;
+
+        assert_eq!(count_conn.load(Ordering::Relaxed), 1);
+        match res {
+            Ok(_) => panic!("Connect did not error"),
+            Err(Error::Timeout) => (),
+            Err(_) => panic!("Wrong error"),
+        }
+        assert_eq!(count.load(Ordering::Relaxed), 0);
+    }
+
+    #[tokio::test]
+    async fn test_try_next_connector() {
+        let (rr, count_conn) = build_rr(vec![0, 1], 1);
+
+        let count = AtomicUsize::new(0);
+
+        rr.run(|_| async { Ok(count.fetch_add(1, Ordering::Relaxed)) }).await.unwrap();
+
+        assert_eq!(count_conn.load(Ordering::Relaxed), 2);
+        assert_eq!(count.load(Ordering::Relaxed), 1);
+    }
+
+    #[tokio::test]
+    async fn test_abort() {
+        let (rr, _) = build_rr(vec![0, 1], 1);
+
+        let res = rr.run(|_| async { Err::<(), _>(Error::NotFound) }).await;
+
+        match res {
+            Ok(_) => panic!("Run did not error"),
+            Err(Error::NotFound) => (),
+            Err(Error::Timeout) => panic!("Connector error aborted"),
+        }
+    }
+}
