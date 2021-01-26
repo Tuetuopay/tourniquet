@@ -30,3 +30,7 @@ tokio = { version = "0.2", features = ["macros", "rt-threaded", "net", "io-util"
 
 [features]
 trace = ["tracing", "tracing-futures"]
+
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = ["--cfg", "docsrs"]
