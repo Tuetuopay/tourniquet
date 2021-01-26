@@ -2,3 +2,5 @@
 
 #[cfg(feature = "celery")]
 pub mod celery;
+#[cfg(feature = "restson")]
+pub mod restson;

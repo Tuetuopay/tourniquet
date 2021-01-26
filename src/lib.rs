@@ -57,6 +57,8 @@ pub mod integrations;
 pub mod conn {
     #[cfg(feature = "celery")]
     pub use crate::integrations::celery::CeleryConnector;
+    #[cfg(feature = "restson")]
+    pub use crate::integrations::restson::RestsonConnector;
 }
 
 /// Trait indicating wether an error mandates trying the next service.
