@@ -22,6 +22,8 @@ tracing-futures = { version = "0.2", optional = true }
 
 # Dependencies for optional integrations
 celery = { version = "0.4.0-rc8", optional = true, default-features = false }
+restson-lib = { version = "0.7", package = "restson", optional = true }
+serde = { version = "1", optional = true }
 
 [dev-dependencies]
 celery = "0.4.0-rc8"
@@ -30,7 +32,13 @@ tokio = { version = "1", features = ["macros", "rt-multi-thread", "net", "io-uti
 
 [features]
 trace = ["tracing", "tracing-futures"]
+restson = ["restson-lib", "serde"]
 
 [package.metadata.docs.rs]
 all-features = true
 rustdoc-args = ["--cfg", "docsrs"]
+
+[patch.crates-io.restson-lib]
+git = "https://github.com/Tuetuopay/restson-rust.git"
+package = "restson"
+branch = "const-self-tokio-1.0"

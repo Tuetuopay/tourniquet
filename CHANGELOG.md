@@ -18,6 +18,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Upgrade to Tokio 1
 
+### Added
+
+- [restson](https://docs.rs/restson) integration, but
+  [async](https://github.com/Tuetuopay/restson-rust/tree/const-self)
+
 ### Fixed
 
 - Fix [docs.rs](https://docs.rs/tourniquet) metadata to properly show feature flags
