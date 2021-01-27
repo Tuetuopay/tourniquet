@@ -8,7 +8,7 @@ use celery::{
     broker::{AMQPBroker, Broker},
     error::BrokerError::BadRoutingPattern,
     error::CeleryError::{self, *},
-    task::{Signature, Task},
+    task::{AsyncResult, Signature, Task},
     Celery,
 };
 #[cfg(feature = "trace")]
@@ -116,7 +116,7 @@ where
             err,
         ),
     )]
-    pub async fn send_task<T, F>(&self, task_gen: F) -> Result<String, CeleryError>
+    pub async fn send_task<T, F>(&self, task_gen: F) -> Result<AsyncResult, CeleryError>
     where
         T: Task + 'static,
         F: Fn() -> Signature<T>,
@@ -130,6 +130,6 @@ where
         #[cfg(feature = "trace")]
         Span::current().record("task_id", &display(&task.task_id));
 
-        Ok(task.task_id)
+        Ok(task)
     }
 }
