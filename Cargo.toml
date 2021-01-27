@@ -16,19 +16,19 @@ edition = "2018"
 
 [dependencies]
 async-trait = "0.1"
-tokio = { version = "0.2", features = ["sync"] }
+tokio = { version = "1", features = ["sync"] }
 tracing = { version = "0.1", optional = true }
 tracing-futures = { version = "0.2", optional = true }
 
 # Dependencies for optional integrations
-celery = { version = "0.3", optional = true, default-features = false }
+celery = { version = "0.4.0-rc6", optional = true, default-features = false }
 restson-lib = { version = "0.7", package = "restson", optional = true }
 serde = { version = "1", optional = true }
 
 [dev-dependencies]
-celery = "0.3"
+celery = "0.4.0-rc6"
 serde = "1.0"
-tokio = { version = "0.2", features = ["macros", "rt-threaded", "net", "io-util"] }
+tokio = { version = "1", features = ["macros", "rt-multi-thread", "net", "io-util"] }
 
 [features]
 trace = ["tracing", "tracing-futures"]
@@ -41,4 +41,8 @@ rustdoc-args = ["--cfg", "docsrs"]
 [patch.crates-io.restson-lib]
 git = "https://github.com/Tuetuopay/restson-rust.git"
 package = "restson"
-branch = "const-self"
+branch = "const-self-tokio-1.0"
+
+[patch.crates-io.celery]
+git = "https://github.com/rusty-celery/rusty-celery.git"
+branch = "main"

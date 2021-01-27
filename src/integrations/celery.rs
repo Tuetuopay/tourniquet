@@ -7,7 +7,7 @@ use async_trait::async_trait;
 use celery::{
     broker::{AMQPBroker, Broker},
     error::CeleryError::{self, *},
-    task::{Signature, Task},
+    task::{AsyncResult, Signature, Task},
     Celery,
 };
 #[cfg(feature = "trace")]
@@ -19,10 +19,9 @@ use tracing::{
 impl Next for CeleryError {
     fn is_next(&self) -> bool {
         match self {
-            UnknownQueue(_) | BrokerError(_) | IoError(_) | ProtocolError(_) => true,
+            BrokerError(_) | IoError(_) | ProtocolError(_) => true,
             NoQueueToConsume
             | ForcedShutdown
-            | BadRoutingPattern(_)
             | TaskRegistrationError(_)
             | UnregisteredTaskError(_) => false,
         }
@@ -74,7 +73,7 @@ impl<'a> Connector<String, Celery<AMQPBroker>, CeleryError> for CeleryConnector<
 impl<SvcSrc, B, Conn> RoundRobin<SvcSrc, Celery<B>, CeleryError, Conn>
 where
     SvcSrc: Debug,
-    B: Broker,
+    B: Broker + 'static,
     Conn: Connector<SvcSrc, Celery<B>, CeleryError>,
 {
     /// Send a Celery task.
@@ -85,7 +84,7 @@ where
     /// # Example
     ///
     /// ```rust,no_run
-    /// # use celery::TaskResult;
+    /// # use celery::task::TaskResult;
     /// # use tourniquet::{RoundRobin, conn::CeleryConnector};
     /// #
     /// #[celery::task]
@@ -115,7 +114,7 @@ where
             err,
         ),
     )]
-    pub async fn send_task<T, F>(&self, task_gen: F) -> Result<String, CeleryError>
+    pub async fn send_task<T, F>(&self, task_gen: F) -> Result<AsyncResult, CeleryError>
     where
         T: Task + 'static,
         F: Fn() -> Signature<T>,
@@ -124,11 +123,11 @@ where
         tracing::info!("Sending task {}", Signature::<T>::task_name());
 
         let task_gen = &task_gen;
-        let task_id = self.run(|celery| async move { celery.send_task(task_gen()).await }).await?;
+        let res = self.run(|celery| async move { celery.send_task(task_gen()).await }).await?;
 
         #[cfg(feature = "trace")]
-        Span::current().record("task_id", &display(&task_id));
+        Span::current().record("task_id", &display(&res.task_id));
 
-        Ok(task_id)
+        Ok(res)
     }
 }
