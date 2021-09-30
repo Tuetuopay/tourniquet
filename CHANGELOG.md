@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
+### Changed
+
+- Upgrade to Tokio 1
+
 ### Fixed
 
 - Fix [docs.rs](https://docs.rs/tourniquet) metadata to properly show feature flags
