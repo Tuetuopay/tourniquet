@@ -133,3 +133,7 @@ where
         Ok(task)
     }
 }
+
+/// Shorthand type for a basic RoundRobin type using Celery
+pub type CeleryRoundRobin =
+    RoundRobin<String, Celery<AMQPBroker>, CeleryError, CeleryConnector<'static>>;
