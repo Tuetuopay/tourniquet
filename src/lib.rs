@@ -294,10 +294,7 @@ where
                 Ok(t) => return Ok(t),
                 Err(e) => {
                     if e.is_next() {
-                        #[cfg(feature = "tracing")]
-                        tracing::error!("Service {}/{} failed: {}", current % n_svc, n_svc, e);
-                        #[cfg(not(feature = "tracing"))]
-                        eprintln!("Service {}/{} failed: {}", current % n_svc, n_svc, e);
+                        log::error!("Service {}/{} failed: {}", current % n_svc, n_svc, e);
 
                         self.current.fetch_add(1, Ordering::Relaxed);
                         attempts += 1;
