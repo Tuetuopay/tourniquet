@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Increase default max_attempts count by one
 - BREAKING: Refactor project as a workspace, where integrations are separate crates
 
 ## [v0.3.0] - 2021-10-05

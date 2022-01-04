@@ -215,7 +215,7 @@ where
     /// ```
     pub fn new(sources: Vec<SvcSrc>, connector: Conn) -> Self {
         Self {
-            max_attempts: sources.len(),
+            max_attempts: sources.len() + 1,
             sources,
             connector,
             service: RwLock::new(None),
@@ -227,6 +227,11 @@ where
     /// Set how many times we will try the next service in case of failure.
     pub fn set_max_attempts(&mut self, count: usize) {
         self.max_attempts = count;
+    }
+
+    /// Set how many times we will try the next service in case of failure.
+    pub fn max_attempts(self, count: usize) -> Self {
+        Self { max_attempts: count, ..self }
     }
 
     #[cfg_attr(
