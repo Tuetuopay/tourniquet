@@ -167,8 +167,7 @@ where
         T: Task + 'static,
         F: Fn() -> Signature<T> + Send + Sync,
     {
-        #[cfg(feature = "trace")]
-        tracing::info!("Sending task {}", Signature::<T>::task_name());
+        log::debug!("Sending task {}", Signature::<T>::task_name());
 
         let task_gen = &task_gen;
         let task = self.run(|celery| async move { Ok(celery.send_task(task_gen()).await?) }).await?;
