@@ -3,6 +3,15 @@
 Easily round-robin between servers providing the same service, automatically reconnecting to the
 next server should an error happen.
 
+This library facilitates resiliency to multiple service providers (e.g. servers) by connecting
+to the first available service from a list in a round-robin manner. If for some reason any
+provider goes down, any attempt to interact with it will reconnect to the next one,
+automatically.
+
+Disclaimer: this library is not for load-balancing between a set of providers! It will connect
+to _one_ provider, and only use this one provider as long as it is up. Tourniquet is meant for
+resiliency and not for load balancing.
+
 ## Example
 
 ```rust
@@ -24,7 +33,7 @@ impl Connector<IpAddr, Mutex<TcpStream>, Error> for Conn {
 #[tokio::main]
 async fn main() {
     let rr = RoundRobin::new(
-        vec!["185.30.166.38".parse().unwrap(), "66.110.9.37".parse().unwrap()],
+        vec!["46.16.175.175".parse().unwrap(), "51.161.82.214".parse().unwrap()],
         Conn(6667),
     );
 
@@ -34,7 +43,7 @@ async fn main() {
         sock.read_exact(&mut buf).await.map(|_| String::from_utf8(buf.to_vec()).unwrap())
     }).await.unwrap();
 
-    assert!(hello.contains("freenode.net"));
+    assert!(hello.contains("libera.chat"));
 }
 ```
 

@@ -1,4 +1,32 @@
-//! Tourniquet integration with the [celery](https://docs.rs/celery) library.
+//! [Tourniquet](https://docs.rs/tourniquet) integration with the [celery](https://docs.rs/celery)
+//! library.
+//!
+//! # Example
+//!
+//! ```rust,no_run
+//! # use celery::task::TaskResult;
+//! # use tourniquet::RoundRobin;
+//! # use tourniquet_celery::{CeleryConnector, RoundRobinExt};
+//! #
+//! #[celery::task]
+//! async fn do_work(work: String) -> TaskResult<()> {
+//!     // Some work
+//! # println!("{}", work);
+//!     Ok(())
+//! }
+//!
+//! # #[tokio::main]
+//! # async fn main() -> Result<(), Box<dyn std::error::Error>> {
+//! let rr = RoundRobin::new(
+//!     vec!["amqp://rabbit01:5672/".to_owned(), "amqp://rabbit02:5672".to_owned()],
+//!     CeleryConnector { name: "rr", routes: &[("*", "my_route")], ..Default::default() },
+//! );
+//!
+//! # let work = "foo".to_owned();
+//! rr.send_task(|| do_work::new(work.clone())).await.expect("Failed to send task");
+//! # Ok(())
+//! # }
+//! ```
 
 use std::error::Error;
 use std::fmt::{Debug, Display, Error as FmtError, Formatter};
@@ -18,8 +46,8 @@ use tracing::{
     instrument, Span,
 };
 
-/// Wrapper for [`CeleryError`](https://docs.rs/celery/latest/celery/error/struct.CeleryError.html) that
-/// implements [`Next`](https://docs.rs/tourniquet/latest/tourniquet/trait.Next.html).
+/// Wrapper for [`CeleryError`](https://docs.rs/celery/latest/celery/error/struct.CeleryError.html)
+/// that implements [`Next`](https://docs.rs/tourniquet/latest/tourniquet/trait.Next.html).
 pub struct RRCeleryError(CeleryError);
 
 impl Next for RRCeleryError {
@@ -126,33 +154,6 @@ where
     ///
     /// The `task_gen` argument returns a signature for each attempt, should each attempt hold a
     /// different value (e.g. trace id, attempt id, timestamp, ...).
-    ///
-    /// # Example
-    ///
-    /// ```rust,no_run
-    /// # use celery::task::TaskResult;
-    /// # use tourniquet::RoundRobin;
-    /// # use tourniquet_celery::{CeleryConnector, RoundRobinExt};
-    /// #
-    /// #[celery::task]
-    /// async fn do_work(work: String) -> TaskResult<()> {
-    ///     // Some work
-    /// # println!("{}", work);
-    ///     Ok(())
-    /// }
-    ///
-    /// # #[tokio::main]
-    /// # async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    /// let rr = RoundRobin::new(
-    ///     vec!["amqp://rabbit01:5672/".to_owned(), "amqp://rabbit02:5672".to_owned()],
-    ///     CeleryConnector { name: "rr", routes: &[("*", "my_route")], ..Default::default() },
-    /// );
-    ///
-    /// # let work = "foo".to_owned();
-    /// rr.send_task(|| do_work::new(work.clone())).await.expect("Failed to send task");
-    /// # Ok(())
-    /// # }
-    /// ```
     #[cfg_attr(
         feature = "trace",
         instrument(

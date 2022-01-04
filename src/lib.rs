@@ -1,6 +1,15 @@
 //! Easily round-robin between servers providing the same service, automatically reconnecting to the
 //! next server should an error happen.
 //!
+//! This library facilitates resiliency to multiple service providers (e.g. servers) by connecting
+//! to the first available service from a list in a round-robin manner. If for some reason any
+//! provider goes down, any attempt to interact with it will reconnect to the next one,
+//! automatically.
+//!
+//! Disclaimer: this library is not for load-balancing between a set of providers! It will connect
+//! to _one_ provider, and only use this one provider as long as it is up. Tourniquet is meant for
+//! resiliency and not for load balancing.
+//!
 //! # Example
 //!
 //! ```rust
