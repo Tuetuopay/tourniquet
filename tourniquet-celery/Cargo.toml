@@ -1,11 +1,11 @@
 [package]
-name = "tourniquet"
-version = "0.4.0"
+name = "tourniquet-celery"
+version = "0.1.0"
 authors = ["Tuetuopay <tuetuopay@me.com>"]
 license = "MIT"
 readme = "README.md"
 repository = "https://github.com/Tuetuopay/tourniquet"
-description = "Async native round-robin manager for remote services"
+description = "Async native round-robin manager for remote services. celery integration."
 categories = [
     "algorithms",
     "asynchronous",
@@ -14,23 +14,16 @@ categories = [
 keywords = ["async", "round-robin"]
 edition = "2021"
 
-[workspace]
-members = [
-    "tourniquet-celery",
-]
-
 [dependencies]
 async-trait = "0.1"
-tokio = { version = "1", features = ["sync"] }
+celery = { version = "0.4.0-rcn.11", default-features = false }
+tourniquet = { version = "0.4", path = ".." }
 tracing = { version = "0.1", optional = true }
-tracing-futures = { version = "0.2", optional = true }
 
 [dev-dependencies]
+celery = "0.4.0-rc8"
+serde = "1.0"
 tokio = { version = "1", features = ["macros", "rt-multi-thread", "net", "io-util"] }
 
 [features]
-trace = ["tracing", "tracing-futures"]
-
-[package.metadata.docs.rs]
-all-features = true
-rustdoc-args = ["--cfg", "docsrs"]
+trace = ["tracing"]

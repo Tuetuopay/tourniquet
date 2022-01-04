@@ -22,7 +22,7 @@
 //! #[tokio::main]
 //! async fn main() {
 //!     let rr = RoundRobin::new(
-//!         vec!["185.30.166.38".parse().unwrap(), "66.110.9.37".parse().unwrap()],
+//!         vec!["46.16.175.175".parse().unwrap(), "51.161.82.214".parse().unwrap()],
 //!         Conn(6667),
 //!     );
 //!
@@ -32,7 +32,7 @@
 //!         sock.read_exact(&mut buf).await.map(|_| String::from_utf8(buf.to_vec()).unwrap())
 //!     }).await.unwrap();
 //!
-//!     assert!(hello.contains("freenode.net"));
+//!     assert!(hello.contains("libera.chat"));
 //! }
 //! ```
 
@@ -51,13 +51,6 @@ use tracing::{
     field::{debug, display, Empty},
     instrument, Instrument, Span,
 };
-
-pub mod integrations;
-
-pub mod conn {
-    #[cfg(feature = "celery")]
-    pub use crate::integrations::celery::CeleryConnector;
-}
 
 /// Trait indicating wether an error mandates trying the next service.
 ///

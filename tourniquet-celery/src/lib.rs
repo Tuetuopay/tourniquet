@@ -1,8 +1,8 @@
 //! Tourniquet integration with the [celery](https://docs.rs/celery) library.
 
-use std::fmt::Debug;
+use std::error::Error;
+use std::fmt::{Debug, Display, Error as FmtError, Formatter};
 
-use crate::{Connector, Next, RoundRobin};
 use async_trait::async_trait;
 use celery::{
     broker::{AMQPBroker, Broker},
@@ -11,15 +11,20 @@ use celery::{
     task::{AsyncResult, Signature, Task},
     Celery,
 };
+use tourniquet::{Connector, Next, RoundRobin};
 #[cfg(feature = "trace")]
 use tracing::{
     field::{display, Empty},
     instrument, Span,
 };
 
-impl Next for CeleryError {
+/// Wrapper for [`CeleryError`](https://docs.rs/celery/latest/celery/error/struct.CeleryError.html) that
+/// implements [`Next`](https://docs.rs/tourniquet/latest/tourniquet/trait.Next.html).
+pub struct RRCeleryError(CeleryError);
+
+impl Next for RRCeleryError {
     fn is_next(&self) -> bool {
-        match self {
+        match self.0 {
             BrokerError(BadRoutingPattern(_)) => false,
             BrokerError(_) | IoError(_) | ProtocolError(_) => true,
             NoQueueToConsume
@@ -27,6 +32,36 @@ impl Next for CeleryError {
             | TaskRegistrationError(_)
             | UnregisteredTaskError(_) => false,
         }
+    }
+}
+
+impl From<CeleryError> for RRCeleryError {
+    fn from(e: CeleryError) -> Self {
+        Self(e)
+    }
+}
+
+impl From<RRCeleryError> for CeleryError {
+    fn from(e: RRCeleryError) -> Self {
+        e.0
+    }
+}
+
+impl Display for RRCeleryError {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), FmtError> {
+        Display::fmt(&self.0, f)
+    }
+}
+
+impl Debug for RRCeleryError {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), FmtError> {
+        Debug::fmt(&self.0, f)
+    }
+}
+
+impl Error for RRCeleryError {
+    fn source(&self) -> Option<&(dyn Error + 'static)> {
+        Some(&self.0)
     }
 }
 
@@ -53,9 +88,9 @@ impl<'a> Default for CeleryConnector<'a> {
 }
 
 #[async_trait]
-impl<'a> Connector<String, Celery<AMQPBroker>, CeleryError> for CeleryConnector<'a> {
+impl<'a> Connector<String, Celery<AMQPBroker>, RRCeleryError> for CeleryConnector<'a> {
     #[cfg_attr(feature = "trace", tracing::instrument(skip(self), err))]
-    async fn connect(&self, url: &String) -> Result<Celery<AMQPBroker>, CeleryError> {
+    async fn connect(&self, url: &String) -> Result<Celery<AMQPBroker>, RRCeleryError> {
         let mut builder = Celery::<AMQPBroker>::builder(self.name, url.as_ref());
 
         if let Some(queue) = self.default_queue {
@@ -68,15 +103,24 @@ impl<'a> Connector<String, Celery<AMQPBroker>, CeleryError> for CeleryConnector<
             builder = builder.broker_connection_timeout(timeout);
         }
 
-        builder.build().await
+        Ok(builder.build().await?)
     }
 }
 
-impl<SvcSrc, B, Conn> RoundRobin<SvcSrc, Celery<B>, CeleryError, Conn>
+#[async_trait]
+pub trait RoundRobinExt {
+    async fn send_task<T, F>(&self, task_gen: F) -> Result<AsyncResult, CeleryError>
+    where
+        T: Task + 'static,
+        F: Fn() -> Signature<T> + Send + Sync;
+}
+
+#[async_trait]
+impl<SvcSrc, B, Conn> RoundRobinExt for RoundRobin<SvcSrc, Celery<B>, RRCeleryError, Conn>
 where
-    SvcSrc: Debug,
+    SvcSrc: Debug + Send + Sync,
     B: Broker + 'static,
-    Conn: Connector<SvcSrc, Celery<B>, CeleryError>,
+    Conn: Connector<SvcSrc, Celery<B>, RRCeleryError> + Send + Sync,
 {
     /// Send a Celery task.
     ///
@@ -87,7 +131,8 @@ where
     ///
     /// ```rust,no_run
     /// # use celery::task::TaskResult;
-    /// # use tourniquet::{RoundRobin, conn::CeleryConnector};
+    /// # use tourniquet::RoundRobin;
+    /// # use tourniquet_celery::{CeleryConnector, RoundRobinExt};
     /// #
     /// #[celery::task]
     /// async fn do_work(work: String) -> TaskResult<()> {
@@ -116,16 +161,16 @@ where
             err,
         ),
     )]
-    pub async fn send_task<T, F>(&self, task_gen: F) -> Result<AsyncResult, CeleryError>
+    async fn send_task<T, F>(&self, task_gen: F) -> Result<AsyncResult, CeleryError>
     where
         T: Task + 'static,
-        F: Fn() -> Signature<T>,
+        F: Fn() -> Signature<T> + Send + Sync,
     {
         #[cfg(feature = "trace")]
         tracing::info!("Sending task {}", Signature::<T>::task_name());
 
         let task_gen = &task_gen;
-        let task = self.run(|celery| async move { celery.send_task(task_gen()).await }).await?;
+        let task = self.run(|celery| async move { Ok(celery.send_task(task_gen()).await?) }).await?;
 
         #[cfg(feature = "trace")]
         Span::current().record("task_id", &display(&task.task_id));
