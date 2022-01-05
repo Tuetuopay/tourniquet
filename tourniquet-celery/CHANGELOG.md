@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Fix CeleryRoundRobin type
 - Use log instead of tracing, and change log levels to debug instead of info
 
 ## [v0.1.0] - 2022-01-04

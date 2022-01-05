@@ -182,4 +182,4 @@ where
 
 /// Shorthand type for a basic RoundRobin type using Celery
 pub type CeleryRoundRobin =
-    RoundRobin<String, Celery<AMQPBroker>, CeleryError, CeleryConnector<'static>>;
+    RoundRobin<String, Celery<AMQPBroker>, RRCeleryError, CeleryConnector<'static>>;
