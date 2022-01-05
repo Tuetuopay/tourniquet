@@ -28,13 +28,14 @@
 
 use std::error::Error as StdError;
 use std::fmt::{Debug, Display, Error as FmtError, Formatter};
+use std::future::Future;
 
 use async_trait::async_trait;
 use tonic::{
     transport::{Channel, Endpoint, Uri},
     Status,
 };
-use tourniquet::{Connector, Next};
+use tourniquet::{Connector, Next, RoundRobin};
 
 /// Wrapper for Tonic's errors (`Status` and transport `Error`)
 #[derive(Debug)]
@@ -128,3 +129,38 @@ impl Connector<&'static str, Channel, Error> for TonicConnector {
         Ok(ep.connect().await?)
     }
 }
+
+#[async_trait]
+pub trait RoundRobinExt {
+    async fn chan<R, Fut, T, E>(&self, run: R) -> Result<T, Error>
+    where
+        T: Send + Sync,
+        R: Fn(Channel) -> Fut + Send + Sync,
+        Fut: Future<Output = Result<T, E>> + Send + Sync,
+        Error: From<E>;
+}
+
+#[async_trait]
+impl<SvcSrc, Conn> RoundRobinExt for RoundRobin<SvcSrc, Channel, Error, Conn>
+where
+    SvcSrc: Debug + Send + Sync,
+    Conn: Connector<SvcSrc, Channel, Error> + Send + Sync,
+{
+    #[cfg_attr(feature = "trace", tracing::instrument(skip(self, run), err))]
+    async fn chan<R, Fut, T, E>(&self, run: R) -> Result<T, Error>
+    where
+        T: Send + Sync,
+        R: Fn(Channel) -> Fut + Send + Sync,
+        Fut: Future<Output = Result<T, E>> + Send + Sync,
+        Error: From<E>,
+    {
+        self.run(|chan| {
+            let fut = run(chan.as_ref().clone());
+            async move { Ok(fut.await?) }
+        })
+        .await
+    }
+}
+
+/// Shorthand type for a Tonic round-robin
+pub type TonicRoundRobin<T> = tourniquet::RoundRobin<T, Channel, Error, TonicConnector>;
