@@ -134,9 +134,9 @@ impl Connector<&'static str, Channel, Error> for TonicConnector {
 pub trait RoundRobinExt {
     async fn chan<R, Fut, T, E>(&self, run: R) -> Result<T, Error>
     where
-        T: Send + Sync,
+        T: Send,
         R: Fn(Channel) -> Fut + Send + Sync,
-        Fut: Future<Output = Result<T, E>> + Send + Sync,
+        Fut: Future<Output = Result<T, E>> + Send,
         Error: From<E>;
 }
 
@@ -149,9 +149,9 @@ where
     #[cfg_attr(feature = "trace", tracing::instrument(skip(self, run), err))]
     async fn chan<R, Fut, T, E>(&self, run: R) -> Result<T, Error>
     where
-        T: Send + Sync,
+        T: Send,
         R: Fn(Channel) -> Fut + Send + Sync,
-        Fut: Future<Output = Result<T, E>> + Send + Sync,
+        Fut: Future<Output = Result<T, E>> + Send,
         Error: From<E>,
     {
         self.run(|chan| {
