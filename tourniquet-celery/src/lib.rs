@@ -170,7 +170,8 @@ where
         log::debug!("Sending task {}", Signature::<T>::task_name());
 
         let task_gen = &task_gen;
-        let task = self.run(|celery| async move { Ok(celery.send_task(task_gen()).await?) }).await?;
+        let task =
+            self.run(|celery| async move { Ok(celery.send_task(task_gen()).await?) }).await?;
 
         #[cfg(feature = "trace")]
         Span::current().record("task_id", &display(&task.task_id));
