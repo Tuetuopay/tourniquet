@@ -44,6 +44,22 @@
 //!     assert!(hello.contains("libera.chat"));
 //! }
 //! ```
+//!
+//! # Integrations
+//!
+//! Tourniquet provides some integrations with existing crates, which shorthand functions to reduce
+//! boilerplate, as the raw `run` function may not be the most wieldy to use. It currently
+//! integrates with the following crates:
+//!
+//! - [`celery`] with [`tourniquet-celery`]: provides a near drop-in replacement for the regular
+//!   `send_task` function from [`celery`]
+//! - [`tonic`] with [`tourniquet-tonic`]: provides a shorthand `chan` function with a cloned
+//!   channel rather than an `Arc`-ed one
+//!
+//! [`celery`]: https://lib.rs/celery
+//! [`tonic`]: https://lib.rs/tonic
+//! [`tourniquet-celery`]: https://lib.rs/tourniquet-celery
+//! [`tourniquet-tonic`]: https://lib.rs/tourniquet-tonic
 
 use core::future::Future;
 use std::{
