@@ -1,6 +1,6 @@
 [package]
 name = "tourniquet-tonic"
-version = "0.1.1"
+version = "0.1.2"
 authors = ["Tuetuopay <tuetuopay@me.com>"]
 license = "MIT"
 readme = "README.md"
@@ -24,7 +24,6 @@ tower-service = "0.3"
 tracing = { version = "0.1", optional = true }
 
 [dev-dependencies]
-celery = "0.4.0-rc8"
 prost = "0.8"
 prost-types = "0.8"
 serde = "1.0"
