@@ -17,18 +17,18 @@ edition = "2021"
 [dependencies]
 async-trait = "0.1"
 http = "0.2"
-tonic = { version = "0.7", default-features = false, features = ["transport"] }
+tonic = { version = "0.8", default-features = false, features = ["transport"] }
 log = "0.4"
 tourniquet = { version = "0.4", path = ".." }
 tower-service = "0.3"
 tracing = { version = "0.1", optional = true }
 
 [dev-dependencies]
-prost = "0.10"
-prost-types = "0.10"
+prost = "0.11"
+prost-types = "0.11"
 serde = "1.0"
 tokio = { version = "1", features = ["macros", "rt-multi-thread", "net", "io-util"] }
-tonic = { version = "0.7", features = ["compression"] }
+tonic = "0.8"
 
 [features]
 trace = ["tracing", "tourniquet/trace"]

@@ -1,5 +1,7 @@
-# We use tonic 0.7 + prost 0.10, which correspond to protoc-gen-prost 0.1 and protoc-gen-tonic 0.1
-PROTOC_PLUGINS = protoc-gen-prost-0.1.4 protoc-gen-tonic-0.1.1
+# We use tonic 0.8 + prost 0.11, which correspond to protoc-gen-prost 0.2 and protoc-gen-tonic 0.2
+PROTOC_PLUGINS = protoc-gen-prost-0.2.0 protoc-gen-tonic-0.2.0
+
+all: gen/helloworld.rs
 
 protoc-gen-%:
 	cargo install --version $(word 2,$(subst -, ,$*)) protoc-gen-$(word 1,$(subst -, ,$*))
