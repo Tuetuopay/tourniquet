@@ -33,11 +33,10 @@ use std::fmt::{Debug, Display, Error as FmtError, Formatter};
 
 use async_trait::async_trait;
 use celery::{
-    broker::{AMQPBroker, Broker},
     error::BrokerError::BadRoutingPattern,
     error::CeleryError::{self, *},
     task::{AsyncResult, Signature, Task},
-    Celery,
+    Celery, CeleryBuilder,
 };
 use tourniquet::{Connector, Next, RoundRobin};
 #[cfg(feature = "trace")]
@@ -116,16 +115,16 @@ impl<'a> Default for CeleryConnector<'a> {
 }
 
 #[async_trait]
-impl<'a> Connector<String, Celery<AMQPBroker>, RRCeleryError> for CeleryConnector<'a> {
+impl<'a> Connector<String, Celery, RRCeleryError> for CeleryConnector<'a> {
     #[cfg_attr(feature = "trace", tracing::instrument(skip(self), err))]
-    async fn connect(&self, url: &String) -> Result<Celery<AMQPBroker>, RRCeleryError> {
-        let mut builder = Celery::<AMQPBroker>::builder(self.name, url.as_ref());
+    async fn connect(&self, url: &String) -> Result<Celery, RRCeleryError> {
+        let mut builder = CeleryBuilder::new(self.name, url.as_ref());
 
         if let Some(queue) = self.default_queue {
             builder = builder.default_queue(queue);
         }
         for (pattern, queue) in self.routes {
-            builder = builder.task_route(*pattern, *queue);
+            builder = builder.task_route(pattern, queue);
         }
         if let Some(timeout) = self.connection_timeout {
             builder = builder.broker_connection_timeout(timeout);
@@ -144,11 +143,10 @@ pub trait RoundRobinExt {
 }
 
 #[async_trait]
-impl<SvcSrc, B, Conn> RoundRobinExt for RoundRobin<SvcSrc, Celery<B>, RRCeleryError, Conn>
+impl<SvcSrc, Conn> RoundRobinExt for RoundRobin<SvcSrc, Celery, RRCeleryError, Conn>
 where
     SvcSrc: Debug + Send + Sync,
-    B: Broker + 'static,
-    Conn: Connector<SvcSrc, Celery<B>, RRCeleryError> + Send + Sync,
+    Conn: Connector<SvcSrc, Celery, RRCeleryError> + Send + Sync,
 {
     /// Send a Celery task.
     ///
@@ -181,5 +179,4 @@ where
 }
 
 /// Shorthand type for a basic RoundRobin type using Celery
-pub type CeleryRoundRobin =
-    RoundRobin<String, Celery<AMQPBroker>, RRCeleryError, CeleryConnector<'static>>;
+pub type CeleryRoundRobin = RoundRobin<String, Celery, RRCeleryError, CeleryConnector<'static>>;
