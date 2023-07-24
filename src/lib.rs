@@ -236,7 +236,7 @@ where
             connector,
             service: RwLock::new(None),
             current: AtomicUsize::new(0),
-            _phantom: PhantomData::default(),
+            _phantom: PhantomData,
         }
     }
 
