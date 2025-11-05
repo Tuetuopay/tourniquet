@@ -264,8 +264,8 @@ where
         #[cfg(feature = "tracing")]
         {
             let span = Span::current();
-            span.record("index", &display(index));
-            span.record("service", &debug(&self.sources[index]));
+            span.record("index", display(index));
+            span.record("service", debug(&self.sources[index]));
         }
 
         // Connect if not already connected
