@@ -12,7 +12,7 @@ categories = [
     "concurrency",
 ]
 keywords = ["async", "round-robin"]
-edition = "2021"
+edition = "2024"
 
 [dependencies]
 async-trait = "0.1"
