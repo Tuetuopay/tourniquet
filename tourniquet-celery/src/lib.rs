@@ -33,6 +33,7 @@ use std::fmt::{Debug, Display, Error as FmtError, Formatter};
 
 use async_trait::async_trait;
 use celery::{
+    error::BackendError::*,
     error::BrokerError::BadRoutingPattern,
     error::CeleryError::{self, *},
     task::{AsyncResult, Signature, Task},
@@ -45,7 +46,7 @@ use tracing::{
     instrument, Span,
 };
 
-/// Wrapper for [`CeleryError`](https://docs.rs/celery/latest/celery/error/struct.CeleryError.html)
+/// Wrapper for [`CeleryError`](https://docs.rs/celery-rs/latest/celery/error/struct.CeleryError.html)
 /// that implements [`Next`](https://docs.rs/tourniquet/latest/tourniquet/trait.Next.html).
 pub struct RRCeleryError(CeleryError);
 
@@ -54,6 +55,10 @@ impl Next for RRCeleryError {
         match self.0 {
             BrokerError(BadRoutingPattern(_)) => false,
             BrokerError(_) | IoError(_) | ProtocolError(_) => true,
+            BackendError(NotConfigured | Timeout | Redis(_)) => true,
+            BackendError(Serialization(_) | Pool(_) | PoolCreationError(_) | TaskFailed(_)) => {
+                false
+            }
             NoQueueToConsume
             | ForcedShutdown
             | TaskRegistrationError(_)
