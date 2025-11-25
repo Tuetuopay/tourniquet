@@ -4,9 +4,9 @@
 //! # Example
 //!
 //! ```rust,no_run
-//! # use celery::task::TaskResult;
+//! # use celery::{task, task::TaskResult};
 //! # use tourniquet::RoundRobin;
-//! # use tourniquet_celery::{CeleryConnector, RoundRobinExt};
+//! # use tourniquet_celery::{CeleryConnector, CelerySource, RoundRobinExt};
 //! #
 //! #[celery::task]
 //! async fn do_work(work: String) -> TaskResult<()> {
@@ -18,16 +18,17 @@
 //! # #[tokio::main]
 //! # async fn main() -> Result<(), Box<dyn std::error::Error>> {
 //! let rr = RoundRobin::new(
-//!     vec!["amqp://rabbit01:5672/".to_owned(), "amqp://rabbit02:5672".to_owned()],
+//!     vec![CelerySource::from("amqp://rabbit01:5672/".to_owned()), CelerySource::from("amqp://rabbit02:5672".to_owned())],
 //!     CeleryConnector { name: "rr", routes: &[("*", "my_route")], ..Default::default() },
 //! );
 //!
 //! # let work = "foo".to_owned();
-//! rr.send_task(|| do_work::new(work.clone())).await.expect("Failed to send task");
+//! rr.send_task(|| do_work(work.clone())).await.expect("Failed to send task");
 //! # Ok(())
 //! # }
 //! ```
 
+use std::borrow::Cow;
 use std::error::Error;
 use std::fmt::{Debug, Display, Error as FmtError, Formatter};
 
@@ -39,6 +40,8 @@ use celery::{
     task::{AsyncResult, Signature, Task},
     Celery, CeleryBuilder,
 };
+use url::Url;
+
 use tourniquet::{Connector, Next, RoundRobin};
 #[cfg(feature = "trace")]
 use tracing::{
@@ -97,6 +100,37 @@ impl Error for RRCeleryError {
     }
 }
 
+/// Wrapper for String
+#[derive(Clone)]
+pub struct CelerySource(String);
+
+impl From<String> for CelerySource {
+    fn from(src: String) -> Self {
+        Self(src)
+    }
+}
+
+fn safe_source(url: &String) -> Cow<'_, String> {
+    // URL that is safe to log (password stripped)
+    let Some(mut url_safe): Option<Url> = url.parse().ok() else { return Cow::Borrowed(url) };
+    if url_safe.password().is_some() {
+        let _ = url_safe.set_password(Some("********"));
+    }
+    Cow::Owned(url_safe.to_string())
+}
+
+impl Display for CelerySource {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), FmtError> {
+        Display::fmt(&safe_source(&self.0), f)
+    }
+}
+
+impl Debug for CelerySource {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), FmtError> {
+        Debug::fmt(&safe_source(&self.0), f)
+    }
+}
+
 /// Ready to use connector for Celery.
 ///
 /// Please refer to
@@ -120,10 +154,10 @@ impl<'a> Default for CeleryConnector<'a> {
 }
 
 #[async_trait]
-impl<'a> Connector<String, Celery, RRCeleryError> for CeleryConnector<'a> {
-    #[cfg_attr(feature = "trace", tracing::instrument(skip(self), err))]
-    async fn connect(&self, url: &String) -> Result<Celery, RRCeleryError> {
-        let mut builder = CeleryBuilder::new(self.name, url.as_ref());
+impl<'a> Connector<CelerySource, Celery, RRCeleryError> for CeleryConnector<'a> {
+    #[cfg_attr(feature = "trace", instrument(skip(self), err))]
+    async fn connect(&self, src: &CelerySource) -> Result<Celery, RRCeleryError> {
+        let mut builder = CeleryBuilder::new(self.name, src.0.as_ref());
 
         if let Some(queue) = self.default_queue {
             builder = builder.default_queue(queue);
@@ -150,7 +184,7 @@ pub trait RoundRobinExt {
 #[async_trait]
 impl<SvcSrc, Conn> RoundRobinExt for RoundRobin<SvcSrc, Celery, RRCeleryError, Conn>
 where
-    SvcSrc: Debug + Send + Sync,
+    SvcSrc: Debug + Send + Sync + Display + Clone,
     Conn: Connector<SvcSrc, Celery, RRCeleryError> + Send + Sync,
 {
     /// Send a Celery task.
@@ -177,11 +211,25 @@ where
             self.run(|celery| async move { Ok(celery.send_task(task_gen()).await?) }).await?;
 
         #[cfg(feature = "trace")]
-        Span::current().record("task_id", &display(&task.task_id));
+        Span::current().record("task_id", display(&task.task_id));
 
         Ok(task)
     }
 }
 
 /// Shorthand type for a basic RoundRobin type using Celery
-pub type CeleryRoundRobin = RoundRobin<String, Celery, RRCeleryError, CeleryConnector<'static>>;
+pub type CeleryRoundRobin =
+    RoundRobin<CelerySource, Celery, RRCeleryError, CeleryConnector<'static>>;
+
+#[cfg(test)]
+mod tests {
+    use super::CelerySource;
+    
+    #[test]
+    fn test_display_debug_celery_source_strips_password() {
+        let source = CelerySource::from("amqp://mylogin:mypassword@rabbitmq.myserver.com/product".to_owned());
+
+        assert_eq!(format!("{source}"),"amqp://mylogin:********@rabbitmq.myserver.com/product");
+        assert_eq!(format!("{source:?}"),"\"amqp://mylogin:********@rabbitmq.myserver.com/product\"");
+    }
+}

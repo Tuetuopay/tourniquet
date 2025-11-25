@@ -169,6 +169,7 @@ pub trait Connector<SvcSrc, Svc, E> {
 pub struct RoundRobin<SvcSrc, Svc, E, Conn>
 where
     Conn: Connector<SvcSrc, Svc, E>,
+    SvcSrc: ToString + Clone,
 {
     /// Sources used to connect to a service. Usually some form of URL to attempt a connection,
     /// e.g. `amqp://localhost:5672`
@@ -192,7 +193,7 @@ where
 
 impl<SvcSrc, Svc, E, Conn> RoundRobin<SvcSrc, Svc, E, Conn>
 where
-    SvcSrc: Debug,
+    SvcSrc: Debug + Display + Clone,
     E: Next + Display,
     Conn: Connector<SvcSrc, Svc, E>,
 {
@@ -264,8 +265,8 @@ where
         #[cfg(feature = "tracing")]
         {
             let span = Span::current();
-            span.record("index", &display(index));
-            span.record("service", &debug(&self.sources[index]));
+            span.record("index", display(index));
+            span.record("service", debug(self.sources[index].clone()));
         }
 
         // Connect if not already connected
